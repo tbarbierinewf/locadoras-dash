@@ -96,7 +96,8 @@ class FipeScraper(object):
         for link in links:
             this_model = link.split('/')[5].replace('-', ' ')
 
-            levenshtein_score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
+            levenshtein_score = (textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower()) + \
+                                textdistance.damerau_levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower()))/2
             jaccard_score = 1 - textdistance.jaccard(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
 
             if locadora == 'Localiza':
