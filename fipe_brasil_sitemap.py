@@ -96,13 +96,19 @@ class FipeScraper(object):
         for link in links:
             this_model = link.split('/')[5].replace('-', ' ')
 
-            score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
+            levenshtein_score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
+            jaccard_score = 1 - textdistance.jaccard(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
 
-            if row['Model'].lower().split(' ')[0] in this_model.lower():
-                score -= 2
-                
+            if locadora == 'Localiza':
+                additional_score_by = row['Model'].lower().split(' ')[0]
+            else:
+                additional_score_by = row['Model'].lower()
+            if additional_score_by in this_model.lower():
+                levenshtein_score -= 2
+
+
             all_models['Links'].append(link)
-            all_models['Score'].append(score)
+            all_models['Score'].append(jaccard_score * levenshtein_score)
         
         sorted_df = pd.DataFrame(all_models).drop_duplicates().sort_values('Score', ascending=True)
         return sorted_df['Links'].values, modelo
