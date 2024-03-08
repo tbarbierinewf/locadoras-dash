@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from S3Work import S3Facilities
+from fipe_brasil_sitemap import FipeScraper
 
-def get_ranking(df:pd.DataFrame):
+def get_ranking(df:pd.DataFrame, selected_locadora:str):
     this_df = pd.DataFrame()
     this_grouped = df.groupby('Model Info')
 
@@ -14,10 +15,19 @@ def get_ranking(df:pd.DataFrame):
 
     this_df['Last Prices'] = this_grouped['Price'].last()
 
-    ranking = this_df.sort_values('Sales', ascending=False)[:10]
+    ranking = this_df.sort_values('Sales', ascending=False)
     ranking.reset_index(inplace=True)
-    ranking.index = [f"{i}°" for i in range(1, len(ranking) + 1)]
-    return ranking
+
+    if selected_locadora == 'Localiza':
+        subset = ['Model Info', 'Brand', 'Model', 'Year']
+    else:
+        subset = ['Model Info', 'Brand', 'Model', 'Specification', 'Year']
+
+    ranking = pd.merge(ranking, df[subset].drop_duplicates(), how='left', on='Model Info')
+
+    ranking['Posição'] = [f"{i}°" for i in range(1, len(ranking) + 1)]
+
+    return ranking[:25]
 
 
 def extract_timeseries_infos(entire_df, ranking):
@@ -43,16 +53,16 @@ def dataframe_with_selections(df):
     df_with_selections = df.copy()
     df_with_selections.insert(0, "Select", False)
 
-    # Get dataframe row-selections from user with st.data_editor
     edited_df = st.data_editor(
         df_with_selections,
         hide_index=True,
-        num_rows='dynamic',
+        num_rows='fixed',
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
         disabled=df.columns,
+        column_order=['Select', 'Posição', 'Model Info', 'Sales', 'Median Prices', 'Last Prices'],
+        height=560
     )
 
-    # Filter the dataframe using the temporary column, then drop the column
     selected_rows = edited_df[edited_df.Select]
     return selected_rows.drop('Select', axis=1)
 
@@ -82,7 +92,6 @@ if __name__ == "__main__":
 
 
     s3 = S3Facilities('alternative-market-data', 'us-east-1')
-
     listed_files = s3.list_files('used-cars-for-sale/full_data', endswith='.json')
 
     localiza_df = update_data(listed_files, 'localiza')
@@ -113,7 +122,11 @@ if __name__ == "__main__":
 
         df_selected = this_df[(this_df.index.year == selected_year) & (this_df.index.month == selected_month)]
 
-        df_selected['Model Info'] = df_selected['Brand'] + ' ' + df_selected['Model'] + ' ' + df_selected['Year']
+        if selected_locadora == 'Localiza':
+            df_selected['Model Info'] = df_selected['Brand'] + ' ' + df_selected['Model'] + ' ' + df_selected['Year']
+        else:
+            df_selected['Model Info'] = df_selected['Brand'] + ' ' + df_selected['Model'] + ' ' + df_selected['Specification'] + ' ' + df_selected['Year']
+
 
         # df_selected = df_selected[['Model Info', 'Price']]
 
@@ -121,14 +134,25 @@ if __name__ == "__main__":
 
     with col[0]:
         st.markdown('#### Ranking')
-
-        this_ranking = get_ranking(df_selected)
+        this_ranking = get_ranking(df_selected, selected_locadora)
         selection = dataframe_with_selections(this_ranking)['Model Info']
-        
+
+        if not selection.empty:
+            this_cols = st.columns(2, gap='small')
+            with this_cols[0]:
+                st.markdown('### Search for FIPE Prices?')
+            with this_cols[1]:
+                response = st.button('Search')
+
+            if response:
+                scraper = FipeScraper()
+                fipe_df = scraper.search_price(this_ranking[this_ranking['Model Info'].isin(selection)], selected_year, selected_month, selected_locadora)
+                if not fipe_df.empty:
+                    st.dataframe(fipe_df, hide_index=True, use_container_width=True)
+
     with col[1]:
         if not selection.empty:
             time_series = extract_timeseries_infos(df_selected[df_selected['Model Info'].isin(selection)], this_ranking)
-            
             st.markdown('#### Median Price')
             st.altair_chart(alt.Chart(time_series).mark_line().encode(
                 x='Date:T',
@@ -141,4 +165,3 @@ if __name__ == "__main__":
                 y=alt.Y('Sales:Q', scale=alt.Scale(domain=[min(time_series['Sales']), max(time_series['Sales'])])),
                 color='Car Model:N'
             ), use_container_width=True)
-            
