@@ -110,7 +110,7 @@ class FipeScraper(object):
             if locadora == 'Localiza':
                 modelo = row['Model']
             else:
-                modelo = row['Model'] + row['Specification']
+                modelo = row['Model'] + ' ' + row['Specification']
             
             modelo_ano = row['Year'].split('/')[0]
 
