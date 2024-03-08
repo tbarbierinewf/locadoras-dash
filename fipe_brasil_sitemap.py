@@ -90,12 +90,12 @@ class FipeScraper(object):
         for link in links:
             this_model = link.split('/')[5].replace('-', ' ')
 
-            score = textdistance.jaccard(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
+            score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
 
             all_models['Links'].append(link)
             all_models['Score'].append(score)
         
-        sorted_df = pd.DataFrame(all_models).drop_duplicates().sort_values('Score', ascending=False)
+        sorted_df = pd.DataFrame(all_models).drop_duplicates().sort_values('Score', ascending=True)
         return sorted_df['Links'].values
     
     def search_price(self, df_selected:pd.DataFrame, ano_ref, mes, locadora):
