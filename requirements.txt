@@ -2,3 +2,4 @@ pandas==1.5.3
 boto3==1.33.11
 botocore==1.33.11
 bs4==0.0.1
+textdistance==4.6.1
