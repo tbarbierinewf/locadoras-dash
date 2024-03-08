@@ -124,7 +124,7 @@ class FipeScraper(object):
             modelo_ano = row['Year'].split('/')[0]
 
             this_possibilities = [i for i in self.links if marca.lower() in i.split('/')[4].lower() and modelo_ano in i.split('/')[-1]]
-            most_probables, modelo = self.get_more_probable(row, this_possibilities)
+            most_probables, modelo = self.get_more_probable(row, this_possibilities, locadora)
             price, reference = self.get_this_price(most_probables, ano_ref, mes)
             float_price = currency_to_float(price)
 
