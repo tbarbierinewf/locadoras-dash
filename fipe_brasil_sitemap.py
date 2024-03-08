@@ -105,7 +105,7 @@ class FipeScraper(object):
             else:
                 additional_score_by = row['Model'].lower()
             if additional_score_by in this_model.lower():
-                levenshtein_score -= 2
+                levenshtein_score -= levenshtein_score * 0.15
 
 
             all_models['Links'].append(link)
