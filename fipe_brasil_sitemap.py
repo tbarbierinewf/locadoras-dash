@@ -6,6 +6,14 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
+def float_to_currency(value_float:float):
+    value_str = "{:,.2f}".format(value_float)
+    return "R$ " + value_str
+
+
+def currency_to_float(value_str:str):
+    return float(value_str.replace("R$", "").strip().replace(".", "").replace(",", "."))
+    
 class FipeScraper(object):
     def __init__(self, url:str=None, timeout=3):
         self.page_count = 1
@@ -53,7 +61,6 @@ class FipeScraper(object):
         return xml
     
     def get_this_price(self, url_list:str, ano, mes):
-        print(self.formatar_data(ano, mes))
         for url in url_list:
             req = Request(url)
             req.add_header('user-agent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36")
@@ -66,7 +73,7 @@ class FipeScraper(object):
             table.index = [i.lower() for i in table.index]
             try:
                 value = table.loc[self.formatar_data(ano, mes)]['Valor']
-                return value
+                return value, url.split('/')[5].replace('-', ' ')
             except:
                 pass
         return None
@@ -92,12 +99,10 @@ class FipeScraper(object):
         return sorted_df['Links'].values
     
     def search_price(self, df_selected:pd.DataFrame, ano_ref, mes, locadora):
-        print('Ano', ano_ref)
-        print('Mês', mes)
         # Tamanho padrão: 7
         # 4: marca; 5: modelo; 6: ano
 
-        data = {'Model':[], 'Price':[]}
+        data = {'Rank':[], 'Model':[], 'Price':[], 'Collected Price':[], 'Price Diff':[], 'Reference Model':[]}
         for i, row in df_selected.iterrows():
             sel = row['Model Info']
 
@@ -111,10 +116,15 @@ class FipeScraper(object):
 
             this_possibilities = [i for i in self.links if marca.lower() in i.split('/')[4].lower() and modelo_ano in i.split('/')[-1]]
             most_probables = self.get_more_probable(modelo, this_possibilities)
+            price, reference = self.get_this_price(most_probables, ano_ref, mes)
+            float_price = currency_to_float(price)
 
-            price = self.get_this_price(most_probables, ano_ref, mes)
-            data['Model'].append(sel)
+            data['Rank'].append(row['Posição'])
+            data['Model'].append(modelo)
             data['Price'].append(price)
+            data['Collected Price'].append(float_to_currency(row['Median Prices']))
+            data['Price Diff'].append("{:.2f} %".format(-(float_price - row['Median Prices'])/(float_price)*100))
+            data['Reference Model'].append(reference)
         
         return pd.DataFrame(data)
             

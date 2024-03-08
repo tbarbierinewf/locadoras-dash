@@ -149,6 +149,8 @@ if __name__ == "__main__":
                 fipe_df = scraper.search_price(this_ranking[this_ranking['Model Info'].isin(selection)], selected_year, selected_month, selected_locadora)
                 if not fipe_df.empty:
                     st.dataframe(fipe_df, hide_index=True, use_container_width=True)
+                else:
+                    st.write('Data not found.')
 
     with col[1]:
         if not selection.empty:
