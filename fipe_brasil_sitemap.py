@@ -95,7 +95,7 @@ class FipeScraper(object):
             all_models['Links'].append(link)
             all_models['Score'].append(score)
         
-        sorted_df = pd.DataFrame(all_models).drop_duplicates().sort_values('Score', ascending=True)
+        sorted_df = pd.DataFrame(all_models).drop_duplicates().sort_values('Score', ascending=False)
         return sorted_df['Links'].values
     
     def search_price(self, df_selected:pd.DataFrame, ano_ref, mes, locadora):
