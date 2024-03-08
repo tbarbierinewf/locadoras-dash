@@ -76,7 +76,7 @@ class FipeScraper(object):
                 return value, url.split('/')[5].replace('-', ' ')
             except:
                 pass
-        return None
+        return 'Not found', url.split('/')[5].replace('-', ' ')
 
     def get_links(self, xml:str=None):
         if xml == None:
@@ -96,17 +96,13 @@ class FipeScraper(object):
         for link in links:
             this_model = link.split('/')[5].replace('-', ' ')
 
-            if locadora != 'Localiza':
-                if row['Model'].lower().split(' ')[0] in this_model.lower():
-                    score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
+            score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
 
-                    all_models['Links'].append(link)
-                    all_models['Score'].append(score)
-            else:
-                score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
-
-                all_models['Links'].append(link)
-                all_models['Score'].append(score)
+            if row['Model'].lower().split(' ')[0] in this_model.lower():
+                score -= 2
+                
+            all_models['Links'].append(link)
+            all_models['Score'].append(score)
         
         sorted_df = pd.DataFrame(all_models).drop_duplicates().sort_values('Score', ascending=True)
         return sorted_df['Links'].values, modelo
@@ -126,13 +122,16 @@ class FipeScraper(object):
             this_possibilities = [i for i in self.links if marca.lower() in i.split('/')[4].lower() and modelo_ano in i.split('/')[-1]]
             most_probables, modelo = self.get_more_probable(row, this_possibilities, locadora)
             price, reference = self.get_this_price(most_probables, ano_ref, mes)
-            float_price = currency_to_float(price)
 
+            if price != 'Not found':
+                float_price = currency_to_float(price)
+                data['Price Diff'].append("{:.2f} %".format(-(float_price - row['Median Prices'])/(float_price)*100))
+            else:
+                data['Price Diff'].append('-')
             data['Rank'].append(row['Posição'])
             data['Model'].append(modelo)
             data['Price'].append(price)
             data['Collected Price'].append(float_to_currency(row['Median Prices']))
-            data['Price Diff'].append("{:.2f} %".format(-(float_price - row['Median Prices'])/(float_price)*100))
             data['Reference Model'].append(reference)
         
         return pd.DataFrame(data)
