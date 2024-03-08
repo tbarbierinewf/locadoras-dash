@@ -85,19 +85,31 @@ class FipeScraper(object):
         loc_texts = [loc.text for loc in loc_elements]
         return loc_texts
 
-    def get_more_probable(self, modelo, links):
+    def get_more_probable(self, row, links, locadora):
+
+        if locadora == 'Localiza':
+            modelo = row['Model']
+        else:
+            modelo = row['Model'] + ' ' + row['Specification']
+
         all_models = {'Links':[], 'Score':[]}
         for link in links:
             this_model = link.split('/')[5].replace('-', ' ')
 
-            if modelo.lower().split(' ')[0] in this_model.lower():
+            if locadora != 'Localiza':
+                if row['Model'].lower().split(' ')[0] in this_model.lower():
+                    score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
+
+                    all_models['Links'].append(link)
+                    all_models['Score'].append(score)
+            else:
                 score = textdistance.levenshtein(modelo.lower().replace('.', '').replace('-', ' '), this_model.lower())
 
                 all_models['Links'].append(link)
                 all_models['Score'].append(score)
         
         sorted_df = pd.DataFrame(all_models).drop_duplicates().sort_values('Score', ascending=True)
-        return sorted_df['Links'].values
+        return sorted_df['Links'].values, modelo
     
     def search_price(self, df_selected:pd.DataFrame, ano_ref, mes, locadora):
         # Tamanho padrão: 7
@@ -108,15 +120,11 @@ class FipeScraper(object):
             sel = row['Model Info']
 
             marca = row['Brand']
-            if locadora == 'Localiza':
-                modelo = row['Model']
-            else:
-                modelo = row['Model'] + ' ' + row['Specification']
             
             modelo_ano = row['Year'].split('/')[0]
 
             this_possibilities = [i for i in self.links if marca.lower() in i.split('/')[4].lower() and modelo_ano in i.split('/')[-1]]
-            most_probables = self.get_more_probable(modelo, this_possibilities)
+            most_probables, modelo = self.get_more_probable(row, this_possibilities)
             price, reference = self.get_this_price(most_probables, ano_ref, mes)
             float_price = currency_to_float(price)
 
