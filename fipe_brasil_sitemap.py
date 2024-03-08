@@ -90,7 +90,7 @@ class FipeScraper(object):
         for link in links:
             this_model = link.split('/')[5].replace('-', ' ')
 
-            score = textdistance.levenshtein(modelo.lower(), this_model.lower())
+            score = textdistance.damerau_levenshtein(modelo.lower(), this_model.lower())
 
             all_models['Links'].append(link)
             all_models['Score'].append(score)
