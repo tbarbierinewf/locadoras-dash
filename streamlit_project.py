@@ -3,6 +3,7 @@ import pandas as pd
 import altair as alt
 from S3Work import S3Facilities
 from fipe_brasil_sitemap import FipeScraper
+from datetime import date, timedelta
 
 def get_ranking(df:pd.DataFrame, selected_locadora:str):
     this_df = pd.DataFrame()
@@ -114,13 +115,41 @@ if __name__ == "__main__":
 
         this_df = locadoras_and_data[selected_locadora]
 
-        years_list = sorted(this_df.index.year.unique())
-        selected_year = st.selectbox('Selecione o ano', years_list, index=len(years_list)-1)
-        
-        months_list = sorted(this_df[this_df.index.year == selected_year].index.month.unique())
-        selected_month = st.selectbox('Selecione o mês', months_list, index=len(months_list)-1)
+        sidebar_col = st.columns((1, 1), gap='small')
 
-        df_selected = this_df[(this_df.index.year == selected_year) & (this_df.index.month == selected_month)]
+        with sidebar_col[0]:
+            years_list = sorted(this_df.index.year.unique())
+            initial_selected_year = st.selectbox('Ano de início', years_list, index=0)
+            final_selected_year = st.selectbox('Ano final', years_list, index=len(years_list)-1)
+        
+        with sidebar_col[1]:
+            initial_months_list = sorted(this_df[this_df.index.year == initial_selected_year].index.month.unique())
+            final_months_list = sorted(this_df[this_df.index.year == final_selected_year].index.month.unique())
+            initial_selected_month = st.selectbox('Mês de início', initial_months_list, index=0)
+            final_selected_month = st.selectbox('Mês final', final_months_list, index=len(final_months_list)-1)
+        
+        initial_day = 1
+        final_day = 31
+
+        while True:
+            try:
+                first_loc = this_df.index.get_loc(pd.to_datetime(f'{initial_selected_year}-{initial_selected_month:02d}-{initial_day:02d}'))
+                if not isinstance(first_loc, int):
+                    first_loc = first_loc.start
+                break
+            except:
+                initial_day += 1
+
+        while True:
+            try:
+                final_loc = this_df.index.get_loc(pd.to_datetime(f'{final_selected_year}-{final_selected_month:02d}-{final_day:02d}'))
+                if not isinstance(final_loc, int):
+                    final_loc = final_loc.stop + 1
+                break
+            except:
+                final_day -= 1
+
+        df_selected = this_df.iloc[first_loc:final_loc]
 
         if selected_locadora == 'Localiza':
             df_selected['Model Info'] = df_selected['Brand'] + ' ' + df_selected['Model'] + ' ' + df_selected['Year']
@@ -146,7 +175,7 @@ if __name__ == "__main__":
 
             if response:
                 scraper = FipeScraper()
-                fipe_df = scraper.search_price(this_ranking[this_ranking['Model Info'].isin(selection)], selected_year, selected_month, selected_locadora)
+                fipe_df = scraper.search_price(this_ranking[this_ranking['Model Info'].isin(selection)], initial_selected_year, initial_selected_month, selected_locadora)
                 if not fipe_df.empty:
                     st.dataframe(fipe_df, hide_index=True, use_container_width=True)
                 else:
@@ -167,3 +196,27 @@ if __name__ == "__main__":
                 y=alt.Y('Sales:Q', scale=alt.Scale(domain=[min(time_series['Sales']), max(time_series['Sales'])])),
                 color='Car Model:N'
             ), use_container_width=True)
+
+    if not selection.empty:
+        full_ts = this_df.copy()
+        if selected_locadora == 'Localiza':
+            full_ts['Model Info'] = full_ts['Brand'] + ' ' + full_ts['Model'] + ' ' + full_ts['Year']
+        else:
+            full_ts['Model Info'] = full_ts['Brand'] + ' ' + full_ts['Model'] + ' ' + full_ts['Specification'] + ' ' + full_ts['Year']
+
+        full_ts['Price'] = [float(i.replace('R$ ', '').replace('.', '')) for i in full_ts['Price']]
+
+        full_time_series = extract_timeseries_infos(full_ts[full_ts['Model Info'].isin(selection)], this_ranking)
+        st.markdown('## Historical series')
+        st.markdown('#### Median Price')
+        st.altair_chart(alt.Chart(full_time_series).mark_line().encode(
+            x='Date:T',
+            y=alt.Y('Median Price:Q', scale=alt.Scale(domain=[min(full_time_series['Median Price']), max(full_time_series['Median Price'])])),
+            color='Car Model:N'
+        ), use_container_width=True)
+        st.markdown('#### Sales')
+        st.altair_chart(alt.Chart(full_time_series).mark_line().encode(
+            x='Date:T',
+            y=alt.Y('Sales:Q', scale=alt.Scale(domain=[min(full_time_series['Sales']), max(full_time_series['Sales'])])),
+            color='Car Model:N'
+        ), use_container_width=True)
